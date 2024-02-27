@@ -1,0 +1,23 @@
+# Variables for batch install of multiplatform
+installation_file_local: "/home/vbox/horejsp/yak/Dbvisit_StandbyMP-v11.6.0-win64.zip"
+os_user: oracle
+# Agent variables
+install_dir: C:\Program Files\dbvisit # Software will be installed to this directory
+download_directory: C:\Temp\download # installation file will be downloaded here
+default_backup_dir: '{{install_dir}}\standbymp\backup'
+webserver_address: "{{groups.all[-1]}}" # hostname of the webserver. Takes the last machine from the group in inventory. simple hostname can be provided
+nats_port: 5533
+agent_listen_port: 7890
+passphrase: "admin"
+
+# windows account to run MP agent
+AGENTMANAGERACCOUNT: "oracle"
+AGENTMANAGERPASSWORD: "oracle455"
+AGENTMANAGERDOMAIN: "."
+
+# Control Center Variables
+webserver_port: 4433
+
+# common variables
+dbvisit_binary_prefix_agent: "install-agent-"
+dbvisit_binary_prefix_console: "install-control-"

@@ -1,0 +1,197 @@
+- hosts: all
+  tasks:
+    - name: Include variables from file install_dbvisit_vars_lin.yml
+      include_vars:
+        file: install_dbvisit_vars_linux.yml
+
+    - name: Check for directory {{install_dir}}
+      file:
+        path: "{{install_dir}}"
+        owner: "{{os_user}}"
+        group: "oinstall"
+        state: directory
+      become: yes
+      become_method: sudo
+
+    - name: Check if Central Console binary exists
+      stat:
+        path: "{{install_dir}}/standbymp/bin/dbvcontrol"
+      register: dbvcontrol_exists
+      when:
+        - inventory_hostname == webserver_address
+
+    - name: Get Central Console Service Status
+      shell: systemctl status dbvcontrol
+      register: dbvcontrol_service_status
+      when:
+        - inventory_hostname == webserver_address
+      failed_when:
+        - dbvcontrol_service_status.rc != 0
+        - dbvcontrol_service_status.rc != 3
+        - dbvcontrol_service_status.rc != 4
+
+    # systemctl statuses:
+    #   0 - running
+    #   3 - not running
+    #   4 - does not exist
+    - name: Stop Central Console Service
+      shell: "{{install_dir}}/standbymp/bin/dbvcontrol service stop"
+      become: yes
+      when:
+        - inventory_hostname == webserver_address and dbvcontrol_exists.stat.exists and dbvcontrol_service_status.rc == 0
+      register: result
+      failed_when:
+        - result.rc != 0
+        - result.stdout != "exit status 5"
+
+    - name: Uninstall Central Console Service
+      shell: "{{install_dir}}/standbymp/bin/dbvcontrol service uninstall"
+      when: inventory_hostname == webserver_address
+      become: yes
+      become_method: sudo
+      register: result
+      when:
+        - inventory_hostname == webserver_address
+      failed_when:
+        - result.rc != 0
+        - result.stdout != "exit status 5"
+
+    - name: Check if Dbvagentmanager binary exists
+      stat:
+        path: "{{install_dir}}/standbymp/bin/dbvagentmanager"
+      register: dbvagentmanager_exists
+
+    - name: Get Dbvagentmanager Service Status
+      shell: systemctl status dbvagentmanager
+      register: dbvagentmanager_service_status
+      failed_when:
+        - dbvagentmanager_service_status.rc not in [0,3,4]
+
+    - name: Stop Dbvagentmanager Service
+      shell: "{{install_dir}}/standbymp/bin/dbvagentmanager service stop"
+      become: yes
+      register: result
+      when:
+        - dbvagentmanager_exists.stat.exists
+        - dbvagentmanager_service_status.rc == 0
+      failed_when:
+        - result.rc != 0
+        - result.stdout != "exit status 5"
+
+    - name: Uninstall Dbvagentmanager Service
+      shell: "{{install_dir}}/standbymp/bin/dbvagentmanager service uninstall"
+      become: yes
+      become_method: sudo
+      register: result
+      when: dbvagentmanager_exists.stat.exists and dbvagentmanager_service_status.rc in [0,3]
+      failed_when:
+        - result.rc != 0
+        - result.stdout != "exit status 5"
+
+    - name: Drop {{install_dir}} directory
+      file:
+        path: "{{install_dir}}"
+        owner: "{{os_user}}"
+        state: absent
+      become: yes
+
+    - name: create {{install_dir}} directory
+      file:
+        path: "{{install_dir}}"
+        owner: "{{os_user}}"
+        state: directory
+      become: yes
+
+    - name: Check for directory {{download_directory}}
+      file:
+        path: "{{download_directory}}"
+        owner: "{{os_user}}"
+        group: "oinstall"
+        state: directory
+      become: yes
+      become_method: sudo
+
+    - name: Copy local file {{installation_file_local}} to directory {{download_directory}}
+      copy:
+        src: "{{installation_file_local}}" 
+        dest: "{{download_directory}}"
+        owner: "{{os_user}}"
+        group: "oinstall"
+        mode: '0644'
+      become: yes
+      become_user: "{{os_user}}"
+
+ ###############
+ # Extract file
+ ###############
+    - name: Find in "{{download_directory}}" archive files dbvisit*zip, standby*tar.gz
+      find:
+        file_type: file
+        paths: "{{download_directory}}"
+        patterns: 
+        - '*bvisit*zip'
+        - '*tandby*tar.gz'
+      register: file_name
+      become: yes
+      become_user: "{{os_user}}"
+
+    - name: Unarchive the file
+      unarchive:
+        src: "{{ file_name.files[0].path }}"
+        dest: "{{ download_directory }}"
+        remote_src: yes
+      become: yes
+      become_user: "{{os_user}}"
+      when: file_name is defined
+
+
+##################
+# Install software
+##################
+
+    - name: get installation file name of Dbvagentmanager
+      shell: "ls {{ download_directory }}/{{ dbvisit_binary_prefix_agent }}*"
+      register: executable_agent
+
+    - name: get installation file name of Central Console
+      shell: "ls {{ download_directory }}/{{ dbvisit_binary_prefix_console }}*"
+      register: executable_console
+
+    - name: Install Central Console
+      shell: |
+        "{{executable_console.stdout}}"       -batch       -install-dir {{install_dir}}       -web-server-port {{webserver_port}}       -agent-communications-port {{nats_port}}       -passphrase {{passphrase}}
+      register: console_install_output
+      become: yes
+      become_user: "{{os_user}}"
+      when: inventory_hostname == webserver_address
+
+    - name: Install Dbvagentmanager
+      shell: |
+        "{{executable_agent.stdout}}"     -batch     -install-dir {{install_dir}}     -backup-dir {{default_backup_dir}}     -host-address {{inventory_hostname}}     -control-center-address {{webserver_address}}     -agent-communications-port {{nats_port}}     -agent-file-transfer-port {{agent_listen_port}}     -passphrase {{passphrase}}
+      register: dbvagentmanager_install_output
+      become: yes
+      become_user: "{{os_user}}"
+
+    - name: Install Central Console Service
+      shell: "{{install_dir}}/standbymp/bin/dbvcontrol service install --user {{os_user}}"
+      become: yes
+      become_method: sudo
+      when: inventory_hostname == webserver_address
+
+    - name: Start Central Console
+      shell: "{{install_dir}}/standbymp/bin/dbvcontrol service start"
+      become: yes
+      become_method: sudo
+      when: inventory_hostname == webserver_address
+
+    - name: Install Agent Service
+      shell: "{{install_dir}}/standbymp/bin/dbvagentmanager service install --user {{os_user}}"
+      become: yes
+      become_method: sudo
+
+    - name: Start Agent Service
+      shell: "{{install_dir}}/standbymp/bin/dbvagentmanager service start"
+      become: yes
+      become_method: sudo
+
+

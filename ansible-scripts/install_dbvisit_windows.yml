@@ -1,0 +1,128 @@
+- hosts: all
+  tasks:
+    - name: Include variables from file install_dbvisit_vars_windows.yml
+      include_vars:
+        file: install_dbvisit_vars_windows.yml
+
+    # - name: Check for directory {{download_directory}}
+    #   win_file:
+    #     path: "{{download_directory}}"
+    #     owner: "{{os_user}}"
+    #     state: directory
+    #   become: yes
+    #   become_user: Administrator
+    #   become_method: runas
+
+    # - name: Copy local file {{installation_file_local}} to directory {{download_directory}}
+    #   win_copy:
+    #     src: "{{installation_file_local}}" 
+    #     dest: "{{download_directory}}"
+    #     owner: "{{os_user}}"
+    #   become: yes
+    #   become_method: runas
+    #   become_user: "{{os_user}}"
+
+    # # Unzip installation file
+
+    # - name: Find files with .zip extension using powershell wildcards
+    #   win_find:
+    #     paths: "{{download_directory}}"
+    #     patterns: [ '*bvisit*.zip']
+    #   register: zipfiles
+        
+    # - name: Unzip {{zipfiles.files.0.filename}} file
+    #   community.windows.win_unzip:
+    #     src: '{{download_directory}}\{{zipfiles.files.0.filename}}'
+    #     dest: "{{download_directory}}"
+
+    - name: Find files with .msi extension using powershell wildcards
+      win_find:
+        paths: "{{download_directory}}"
+        patterns: [ '*.msi' ]
+      register: msifiles
+
+    - name: output unzipped files
+      debug:
+        var: msifiles
+
+    # bug in ansible 2.2.+ https://github.com/ansible/ansible/issues/27299
+    # workaround: use to_json | from_json
+    - name: Gather list of files found
+      set_fact:
+        control_install: "{{ (msifiles | to_json | from_json | json_query(jmesquery_control)) }}" # | json_query(jmesquery_control)}}"
+        agent_install: "{{ (msifiles | to_json | from_json | json_query(jmesquery_agent)) }}" # | json_query(jmesquery_control)}}"
+      vars:
+        jmesquery: "files[?contains(filename,'ontrol')]"
+        jmesquery_control: "files[?contains(filename,'ontrol')].path"
+        jmesquery_agent: "files[?contains(filename,'gent')].path"
+
+    # Install Dbvisit Software    
+    - name: Drop Dbvcontrol Service
+      win_service:
+        name: "Dbvisit StandbyMP Control Center"
+        state: absent
+      when:
+        - inventory_hostname == webserver_address      
+      become: yes
+      become_user: Administrator
+      become_method: runas
+
+    - name: Drop Dbvagentmanager Service
+      win_service:
+        name: "Dbvisit StandbyMP Agent"
+        state: absent
+      become: yes
+      become_user: Administrator
+      become_method: runas
+
+    - name: Uninstall Central Console
+      win_package:
+        path: "{{control_install[0]}}"
+        state: absent
+      when:
+        - inventory_hostname == webserver_address
+      become: yes
+      become_user: Administrator
+      become_method: runas
+
+    - name: Uninstall Dbvagentmanager
+      win_package:
+        path: "{{agent_install[0]}}"
+        state: absent
+      become: yes
+      become_user: Administrator
+      become_method: runas
+
+    - name: Check if {{install_dir}} exists
+      win_stat:
+        path: "{{install_dir}}"
+      register: dbvbase_exists
+
+    - name: Drop Directory Structure - "{{install_dir}}"
+      win_file:
+        path: "{{ install_dir }}"
+        state: absent
+      when: dbvbase_exists.stat.exists
+      ignore_errors: yes
+
+    - name: Install MP Agent - "{{ install_dir }}"
+      win_shell: '{{agent_install[0]}} /quiet INSTALLDIR="{{install_dir}}" DEFAULTBACKUPDIR="{{default_backup_dir}}" AGENTMANAGERDOMAIN={{AGENTMANAGERDOMAIN}} AGENTMANAGERPASSWORD={{AGENTMANAGERPASSWORD}} AGENTMANAGERACCOUNT={{AGENTMANAGERACCOUNT}} HOSTADDRESS={{inventory_hostname}} PASSPHRASE={{passphrase}} FTLISTENPORT={{agent_listen_port}} NATSPORT={{nats_port}} NATSADDRESS={{webserver_address}}'
+      register: console_install_output
+      args:
+        executable: cmd
+        chdir: "{{download_directory}}"
+      become: yes
+      become_user: Administrator
+      become_method: runas
+
+    - name: Install MP Central Console - "{{ install_dir }}"
+      win_shell: '{{control_install[0]}} /quiet INSTALLDIR="{{install_dir}}" WEBLISTENPORT={{webserver_port}} NATSLISTENPORT={{nats_port}} PASSPHRASE={{passphrase}}'
+      register: console_install_output
+      args:
+        executable: cmd
+        chdir: "{{download_directory}}"
+      when:
+        - inventory_hostname == webserver_address
+      become: yes
+      become_user: Administrator
+      become_method: runas
