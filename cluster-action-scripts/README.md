@@ -1,12 +1,11 @@
-# cluster-action-script-linux
-## Introduction
+# Introduction
 Cluster Action scripts for dbvagentmanager and dbvcontrol. These scripts are used to add the automatic startup/shutdown and relocate the agentmanager services from one node to other.
 To enable easy SEHA failover for dbvagentmanager we recommend to integrate them into Oracle Grid by using action script.
 
-## Linux
+# Linux
 Use `dbvcrs.sh` for Linux platform. This is a single action script for both dbvagentmanager and dbvcontrol.
 
-### Script Usage
+## Script Usage
 Upload the script to directory `/dbvisit/app/standbymp/bin` (`$DBVISIT_BASE/standbymp/bin`) and set correct privileges:
 ```
 $cd /dbvisit/app/standbymp/bin  
@@ -21,7 +20,7 @@ ORACLE_SID = [root] ? +ASM1
 ```
 The locations provided must match your $DBVIST_BASE location and the servers must changed with your own server names ( node1, node2).
 
-### Additional Information
+## Additional Information
 
 Please remember to create the VIP before adding the action scripts as the VIP will also be relocated when one node goes down. Script for creating VIP (This has to be executed as root user).
 ```
@@ -34,7 +33,7 @@ Please remember to create the VIP before adding the action scripts as the VIP wi
 For detailed user guide explanations, please check the below link:
 https://dbvisit.atlassian.net/wiki/spaces/DSMP/pages/3500081153/Oracle+SEHA+and+RAC+on+Linux
 
-### Example Output
+## Example Output
 When the VIP is relocated to passive/second node the agentmanager will automatically be started in the passive/second node as well.
 ```
 $ crsctl relocate resource dbvisit-vip2178 -f
@@ -48,10 +47,10 @@ CRS-2672: Attempting to start 'dbvagentmanager' on 'czrlin0218'
 CRS-2676: Start of 'dbvagentmanager' on 'czrlin0218' succeeded
 ```
 
-## Windows
+# Windows
 Use `dbvcrs.bat` for Windows platform.
 
-### Script Usage
+## Script Usage
 Upload the script `dbvcrs.bat` to directory `C:\dbvisit\app\bin`
 
 ```
@@ -86,7 +85,7 @@ Create the dbvcontrol cluster resource
 ```
 crsctl add resource dbvcontrol -type generic_application -attr "START_PROGRAM='/dbvisit/app/bin/dbvcrs.bat start dbvcontrol',STOP_PROGRAM='/dbvisit/app/bin/dbvcrs.bat stop dbvcontrol',CHECK_PROGRAMS='/dbvisit/app/bin/dbvcrs.bat check dbvcontrol',CLEAN_PROGRAM='/dbvisit/app/bin/dbvcrs.bat clean dbvcontrol',CHECK_INTERVAL=10,START_DEPENDENCIES='hard(dbvisit-vip12) pullup(dbvisit-vip12) attraction(dbvisit-vip12)',STOP_DEPENDENCIES='hard(dbvisit-vip12)',PLACEMENT='favored',HOSTING_MEMBERS='w22ora19seha1 w22ora19seha2',ACL='owner:dbvisit\oracle:rwx,pgrp::r-x,other::r--'"
 ```
-### Additional Information
+## Additional Information
 Make sure the Oracle Grid Infrastructure is deployed as per Oracle documentation. The group membership for oracle and grid users needs to be correct. Dbvisit supports cluster role separation (oracle and grid user) as well as simple configuration (oracle user only)
 
 Step to create the VIP
