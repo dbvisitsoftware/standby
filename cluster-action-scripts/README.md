@@ -1,6 +1,13 @@
-# Introduction
+# Introduction #
 Cluster Action scripts for dbvagentmanager and dbvcontrol. These scripts are used to add the automatic startup/shutdown and relocate the agentmanager services from one node to other.
 To enable easy SEHA failover for dbvagentmanager we recommend to integrate them into Oracle Grid by using action script.
+
+In this README file:
+
+1. [Introduction](#Introduction)
+2. [Linux](#Linux)
+  1. [Script Usage](##Script-Usage) 
+4. [Widnows](#Windows)
 
 # Linux
 Use `dbvcrs.sh` for Linux platform. This is a single action script for both dbvagentmanager and dbvcontrol.
