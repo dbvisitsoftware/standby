@@ -4,10 +4,15 @@ To enable easy SEHA failover for dbvagentmanager we recommend to integrate them 
 
 In this README file:
 
-1. [Introduction](#Introduction)
-2. [Linux](#Linux)
-  1. [Script Usage](##Script-Usage) 
-4. [Widnows](#Windows)
+1. [Introduction](#introduction)
+2. [Linux](#linux)
+   1. [Script Usage](#script-usage)
+   2. [Additional Information](#additional-information)
+   3. [Example Output](#example-output)
+4. [Widnows](#windows)
+   1. [Script Usage](#script-usage-1)
+   2. [Troubleshooting](#troubleshooting)
+   3. [Additional Information](#additional-information-1)
 
 # Linux
 Use `dbvcrs.sh` for Linux platform. This is a single action script for both dbvagentmanager and dbvcontrol.
@@ -92,6 +97,41 @@ Create the dbvcontrol cluster resource
 ```
 crsctl add resource dbvcontrol -type generic_application -attr "START_PROGRAM='/dbvisit/app/bin/dbvcrs.bat start dbvcontrol',STOP_PROGRAM='/dbvisit/app/bin/dbvcrs.bat stop dbvcontrol',CHECK_PROGRAMS='/dbvisit/app/bin/dbvcrs.bat check dbvcontrol',CLEAN_PROGRAM='/dbvisit/app/bin/dbvcrs.bat clean dbvcontrol',CHECK_INTERVAL=10,START_DEPENDENCIES='hard(dbvisit-vip12) pullup(dbvisit-vip12) attraction(dbvisit-vip12)',STOP_DEPENDENCIES='hard(dbvisit-vip12)',PLACEMENT='favored',HOSTING_MEMBERS='w22ora19seha1 w22ora19seha2',ACL='owner:dbvisit\oracle:rwx,pgrp::r-x,other::r--'"
 ```
+
+## Troubleshooting
+To check and test the script is working properly, run the following commands and check the output (service is stopped, started, etc.)
+```
+cd C:\dbvisit\app\bin
+C:\dbvisit\app\bin>dbvcrs.bat stop dbvagentmanager
+C:\dbvisit\app\bin>dbvcrs.bat check dbvagentmanager
+C:\dbvisit\app\bin>dbvcrs.bat start dbvagentmanager
+C:\dbvisit\app\bin>dbvcrs.bat check dbvagentmanager
+C:\dbvisit\app\bin>dbvcrs.bat clean dbvagentmanager
+
+C:\dbvisit\app\bin>dbvcrs start dbvagentmanager
+Starting service dbvagentmanager
+The Dbvisit StandbyMP Agent service is starting.
+The Dbvisit StandbyMP Agent service was started successfully.
+
+Checking service dbvagentmanager
+
+SERVICE_NAME: dbvagentmanager
+        TYPE               : 10  WIN32_OWN_PROCESS
+        STATE              : 4  RUNNING
+                                (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)
+        WIN32_EXIT_CODE    : 0  (0x0)
+        SERVICE_EXIT_CODE  : 0  (0x0)
+        CHECKPOINT         : 0x0
+        WAIT_HINT          : 0x0
+```
+⚠️ It is expected that command `dbvcrs.bat check dbvagentmanager` will close the current command line window if the dbvagentmanager service isn’t running. In that case try to temporarily modify the script so it writes down the output into the text file. For example:
+```
+:errorexit
+rem exit /b 1
+echo exiting with code 1 > D:\mytext.txt
+exit 1
+```
+
 ## Additional Information
 Make sure the Oracle Grid Infrastructure is deployed as per Oracle documentation. The group membership for oracle and grid users needs to be correct. Dbvisit supports cluster role separation (oracle and grid user) as well as simple configuration (oracle user only)
 
